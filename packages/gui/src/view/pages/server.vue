@@ -122,10 +122,6 @@ export default {
     addWhiteList () {
       this.whiteList.unshift({ key: '', value: true })
     },
-    async openLog () {
-      const dir = await this.$api.info.getConfigDir()
-      this.$api.ipc.openPath(`${dir}/logs/`)
-    },
     getSpeedTestConfig () {
       return this.config.server.dns.speedTest
     },
@@ -202,9 +198,6 @@ export default {
               <a-tag v-else color="red">
                 当前未启动
               </a-tag>
-              <a-button class="md-mr-10" icon="profile" @click="openLog()">
-                日志
-              </a-button>
             </a-form-item>
             <a-form-item label="绑定IP" :label-col="labelCol" :wrapper-col="wrapperCol">
               <a-input v-model="config.server.host" />
@@ -253,7 +246,7 @@ export default {
                 启用拦截
               </a-checkbox>
               <div class="form-help">
-                关闭拦截，且关闭功能增强时，就不需要安装根证书，退化为安全模式
+                关闭拦截，且关闭增强功能时，就不需要安装根证书，退化为安全模式
               </div>
             </a-form-item>
             <a-form-item label="启用脚本" :label-col="labelCol" :wrapper-col="wrapperCol">
@@ -273,7 +266,7 @@ export default {
           />
         </a-tab-pane>
         <a-tab-pane key="3" tab="超时时间设置">
-          <div style="height:100%;display:flex;flex-direction:column;padding-right:10px">
+          <div style="height:100%;display:flex;flex-direction:column">
             <a-form-item label="默认超时时间" :label-col="labelCol" :wrapper-col="wrapperCol">
               请求：<a-input-number v-model="config.server.setting.defaultTimeout" :step="1000" :min="1000" /> ms，对应<code>timeout</code>配置<br>
               连接：<a-input-number v-model="config.server.setting.defaultKeepAliveTimeout" :step="1000" :min="1000" /> ms，对应<code>keepAliveTimeout</code>配置
@@ -407,15 +400,19 @@ export default {
             <a-divider />
             <a-row :gutter="10" class="mt10">
               <a-col span="24">
-                <a-button type="primary" icon="plus" @click="reSpeedTest()">立即重新测速</a-button>
-                <a-button class="md-ml-10" type="primary" icon="reload" @click="reloadAllSpeedTester()">刷新</a-button>
+                <a-button type="primary" icon="plus" @click="reSpeedTest()">
+                  立即重新测速
+                </a-button>
+                <a-button class="md-ml-10" type="primary" icon="reload" @click="reloadAllSpeedTester()">
+                  刷新
+                </a-button>
               </a-col>
             </a-row>
 
             <a-row :gutter="20">
               <a-col v-for="(item, key) of speedTestList" :key="key" span="12">
                 <a-card size="small" class="md-mt-10" :title="key">
-                  <a slot="extra" href="#">
+                  <a slot="extra" href="javascript:void(0)" :title="key" style="cursor:default">
                     <a-icon v-if="item.alive.length > 0" type="check" />
                     <a-icon v-else type="info-circle" />
                   </a>
@@ -434,8 +431,12 @@ export default {
     </div>
     <template slot="footer">
       <div class="footer-bar">
-        <a-button :loading="resetDefaultLoading" class="md-mr-10" icon="sync" @click="resetDefault()">恢复默认</a-button>
-        <a-button :loading="applyLoading" icon="check" type="primary" @click="apply()">应用</a-button>
+        <a-button :loading="resetDefaultLoading" class="md-mr-10" icon="sync" @click="resetDefault()">
+          恢复默认
+        </a-button>
+        <a-button :loading="applyLoading" icon="check" type="primary" @click="apply()">
+          应用
+        </a-button>
       </div>
     </template>
   </ds-container>
@@ -454,7 +455,7 @@ export default {
   }
 
   .jsoneditor-vue {
-    height: 100%
+    height: 100%;
   }
 
   .ant-tabs {

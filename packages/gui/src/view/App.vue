@@ -1,6 +1,7 @@
 <script>
 import createMenus from '@/view/router/menu'
 import zhCN from 'ant-design-vue/lib/locale-provider/zh_CN'
+import { colorTheme } from './composables/theme'
 
 export default {
   name: 'App',
@@ -16,11 +17,19 @@ export default {
   },
   computed: {
     themeClass () {
-      return `theme-${this.config.app.theme}`
+      return `theme-${colorTheme.value}`
     },
     theme () {
-      return this.config.app.theme
+      return colorTheme.value
     },
+  },
+  mounted () {
+    let theme = this.config.app.theme
+    if (this.config.app.theme === 'system') {
+      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    }
+
+    colorTheme.value = theme
   },
   created () {
     this.menus = createMenus(this)
@@ -33,11 +42,11 @@ export default {
     handleClick (e) {
       console.log('click', e)
     },
-    titleClick (e) {
-      console.log('titleClick', e)
+    titleClick (item) {
+      console.log('title click:', item)
     },
     menuClick (item) {
-      console.log('menu click', item)
+      console.log('menu click:', item)
       this.$router.replace(item.path)
     },
   },
@@ -78,7 +87,7 @@ export default {
           </a-layout-content>
           <a-layout-footer>
             <div class="footer">
-              ©2020-2024 docmirror.cn by Greper, WangLiang  <span>{{ info.version }}</span>
+              ©2020-2025 docmirror.cn by Greper, WangLiang  <span>{{ info.version }}</span>
             </div>
           </a-layout-footer>
         </a-layout>
@@ -88,17 +97,17 @@ export default {
 </template>
 
 <style lang="scss">
-body{
+body {
   height: 100%;
 }
-.mt10{
-  margin-top:10px;
+.mt10 {
+  margin-top: 10px;
 }
-.mt5{
-  margin-top:5px;
+.mt5 {
+  margin-top: 5px;
 }
-.mt20{
-  margin-top:20px;
+.mt20 {
+  margin-top: 20px;
 }
 .ds_layout {
   font-family: Avenir, Helvetica, Arial, sans-serif;
@@ -106,31 +115,33 @@ body{
   -moz-osx-font-smoothing: grayscale;
   color: #2c3e50;
   height: 100%;
-  .ant-layout-has-sider{
-    border:1px solid #eee;
+  .ant-layout-has-sider {
+    border: 1px solid #eee;
   }
-  .ant-layout-sider-children{
-    border-right:1px solid #eee;
+  .ant-layout-sider-children {
+    border-right: 1px solid #eee;
   }
-  .ant-layout{
-    height:100%
+  .ant-layout {
+    height: 100%;
   }
-  .logo{
-    padding:5px;
+  .logo {
+    padding: 5px;
     border-bottom: #eee solid 1px;
-    height:60px;
-    background-image: url("/logo/logo-lang.svg");
+    height: 60px;
+    background-image: url('../../public/logo/logo-lang.svg');
     background-size: auto 50px;
     background-repeat: no-repeat;
     background-position: 5px center;
   }
-  .ant-layout-footer{
-    padding:10px;
+  .ant-layout-footer {
+    padding: 10px;
     text-align: center;
-    border-top:#d6d4d4 solid 1px;
+    border-top: #d6d4d4 solid 1px;
   }
-  .ant-menu-inline, .ant-menu-vertical, .ant-menu-vertical-left{
-    border:0;
+  .ant-menu-inline,
+  .ant-menu-vertical,
+  .ant-menu-vertical-left {
+    border: 0;
   }
 }
 </style>

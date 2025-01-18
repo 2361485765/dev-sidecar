@@ -1,11 +1,12 @@
 'use strict'
 /* global __static */
-import path from 'path'
+import path from 'node:path'
 import DevSidecar from '@docmirror/dev-sidecar'
 import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, powerMonitor, protocol, Tray } from 'electron'
 import minimist from 'minimist'
 import { createProtocol } from 'vue-cli-plugin-electron-builder/lib'
 import backend from './bridge/backend'
+import jsonApi from '@docmirror/mitmproxy/src/json'
 import log from './utils/util.log'
 
 const isWindows = process.platform === 'win32'
@@ -13,7 +14,14 @@ const isMac = process.platform === 'darwin'
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
 // 避免其他系统出现异常，只有 Windows 使用 './background/powerMonitor'
-const _powerMonitor = isWindows ? require('./background/powerMonitor').powerMonitor : powerMonitor
+let _powerMonitor = powerMonitor
+if (isWindows) {
+  try {
+    _powerMonitor = require('./background/powerMonitor').powerMonitor
+  } catch (e) {
+    log.error(`加载 './background/powerMonitor' 失败，现捕获异常并使用默认的 powerMonitor。\r\n目前，启动着DS重启电脑时，将无法正常关闭系统代理，届时请自行关闭系统代理！\r\n捕获的异常信息:`, e)
+  }
+}
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -190,7 +198,7 @@ function createWindow (startHideWindow) {
   win.setMenu(null)
 
   // !!IMPORTANT
-  if (isWindows) {
+  if (isWindows && typeof _powerMonitor.setupMainWindow === 'function') {
     _powerMonitor.setupMainWindow(win)
   }
 
@@ -210,8 +218,8 @@ function createWindow (startHideWindow) {
     hideWin()
   }
 
-  win.on('closed', async () => {
-    log.info('win closed:', arguments)
+  win.on('closed', async (...args) => {
+    log.info('win closed:', ...args)
     win = null
     tray = null
   })
@@ -224,8 +232,8 @@ function createWindow (startHideWindow) {
     }
   })
 
-  win.on('close', (e) => {
-    log.info('win close:', arguments)
+  win.on('close', (e, ...args) => {
+    log.info('win close:', e, ...args)
     if (forceClose) {
       return
     }
@@ -248,8 +256,8 @@ function createWindow (startHideWindow) {
     }
   })
 
-  win.on('session-end', async (e) => {
-    log.info('win session-end:', arguments)
+  win.on('session-end', async (e, ...args) => {
+    log.info('win session-end:', e, ...args)
     await quit()
   })
 
@@ -260,6 +268,7 @@ function createWindow (startHideWindow) {
       event.preventDefault()
       // 切换开发者工具显示状态
       switchDevTools()
+      // eslint-disable-next-line style/brace-style
     }
     // 按 F5，刷新页面
     else if (input.key === 'F5') {
@@ -288,8 +297,8 @@ function createWindow (startHideWindow) {
   })
 
   // 监听渲染进程发送过来的消息
-  win.webContents.on('ipc-message', (event, channel, message) => {
-    console.info('win ipc-message:', arguments)
+  win.webContents.on('ipc-message', (event, channel, message, ...args) => {
+    console.info('win ipc-message:', event, channel, message, ...args)
     if (channel === 'change-showHideShortcut') {
       registerShowHideShortcut(message)
     }
@@ -371,7 +380,7 @@ if (app.getLoginItemSettings().wasOpenedAsHidden) {
     startHideWindow = false
   }
 }
-log.info('start hide window:', startHideWindow, app.getLoginItemSettings())
+log.info('startHideWindow = ', startHideWindow, ', app.getLoginItemSettings() = ', jsonApi.stringify2(app.getLoginItemSettings()))
 
 // 禁止双开
 const isFirstInstance = app.requestSingleInstanceLock()
@@ -453,10 +462,6 @@ if (!isFirstInstance) {
         e.preventDefault()
       }
       log.info('系统关机，恢复代理设置')
-      if (isWindows) {
-        const Sysproxy = require('@mihomo-party/sysproxy')
-        Sysproxy.triggerManualProxy(false, '', 0, '')
-      }
       await quit()
     })
   })

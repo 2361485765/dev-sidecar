@@ -1,11 +1,12 @@
-import fs from 'fs'
-import path from 'path'
+import fs from 'node:fs'
+import path from 'node:path'
 import DevSidecar from '@docmirror/dev-sidecar'
 import { ipcMain } from 'electron'
 import lodash from 'lodash'
 
-const pk = require('../../../package.json')
 const jsonApi = require('@docmirror/mitmproxy/src/json')
+const pk = require('../../../package.json')
+const configFromFiles = require('@docmirror/dev-sidecar/src/config/index.js').configFromFiles
 const log = require('../../utils/util.log')
 
 const mitmproxyPath = path.join(__dirname, 'mitmproxy.js')
@@ -30,7 +31,7 @@ const getDateTimeStr = function () {
 const localApi = {
   /**
    * 返回所有api列表，供vue来ipc调用
-   * @returns {[]}
+   * @returns {[]} api列表
    */
   getApiList () {
     const core = lodash.cloneDeep(DevSidecar.api)
@@ -50,8 +51,11 @@ const localApi = {
     getConfigDir () {
       return getDefaultConfigBasePath()
     },
-    getSystemPlatform () {
-      return DevSidecar.api.shell.getSystemPlatform()
+    getLogDir () {
+      return configFromFiles.app.logFileSavePath || path.join(getDefaultConfigBasePath(), '/logs/')
+    },
+    getSystemPlatform (throwIfUnknown = false) {
+      return DevSidecar.api.shell.getSystemPlatform(throwIfUnknown)
     },
   },
   /**

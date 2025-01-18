@@ -1,4 +1,4 @@
-const LRU = require('lru-cache')
+const LRUCache = require('lru-cache')
 const log = require('../../utils/util.log')
 const { DynamicChoice } = require('../choice/index')
 
@@ -22,8 +22,14 @@ class IpCache extends DynamicChoice {
 }
 
 module.exports = class BaseDNS {
-  constructor () {
-    this.cache = new LRU(cacheSize)
+  constructor (dnsName) {
+    this.dnsName = dnsName
+    this.cache = new LRUCache({
+      maxSize: cacheSize,
+      sizeCalculation: () => {
+        return 1
+      },
+    })
   }
 
   count (hostname, ip, isError = true) {
@@ -55,11 +61,11 @@ module.exports = class BaseDNS {
       ipList.push(hostname) // 把原域名加入到统计里去
 
       ipCache.setBackupList(ipList)
-      log.info(`[DNS]: ${hostname} ➜ ${ipCache.value} (${new Date() - t} ms), ipList: ${JSON.stringify(ipList)}, ipCache:`, JSON.stringify(ipCache))
+      log.info(`[DNS '${this.dnsName}']: ${hostname} ➜ ${ipCache.value} (${new Date() - t} ms), ipList: ${JSON.stringify(ipList)}, ipCache:`, JSON.stringify(ipCache))
 
       return ipCache.value
     } catch (error) {
-      log.error(`[DNS] cannot resolve hostname ${hostname} (${error})`, error)
+      log.error(`[DNS '${this.dnsName}'] cannot resolve hostname ${hostname}, error:`, error)
       return hostname
     }
   }

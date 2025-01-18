@@ -1,4 +1,8 @@
-const path = require('path')
+const fs = require('node:fs')
+const path = require('node:path')
+const lodash = require('lodash')
+const jsonApi = require('@docmirror/mitmproxy/src/json')
+const mergeApi = require('../merge')
 
 function getUserBasePath () {
   const userHome = process.env.USERPROFILE || process.env.HOME || '/'
@@ -13,7 +17,7 @@ function getRootCaKeyPath () {
   return path.join(getUserBasePath(), '/dev-sidecar.ca.key.pem')
 }
 
-module.exports = {
+const defaultConfig = {
   app: {
     mode: 'default',
     autoStart: {
@@ -22,7 +26,7 @@ module.exports = {
     remoteConfig: {
       enabled: true,
       // 共享远程配置地址
-      url: 'https://gitee.com/wangliang181230/dev-sidecar/raw/docmirror/packages/core/src/config/remote_config.json5',
+      url: 'https://gitee.com/wangliang181230/dev-sidecar/raw/docmirror2.x/packages/core/src/config/remote_config.json',
       // 个人远程配置地址
       personalUrl: '',
     },
@@ -37,6 +41,10 @@ module.exports = {
     },
     closeStrategy: 0,
     showShutdownTip: true,
+
+    // 日志相关配置
+    logFileSavePath: path.join(getUserBasePath(), '/logs'), // 日志文件保存路径
+    keepLogFileCount: 15, // 保留日志文件数
   },
   server: {
     enabled: true,
@@ -68,7 +76,7 @@ module.exports = {
       },
 
       // 慢速IP延迟时间：测速超过该值时，则视为延迟高，显示为橙色
-      lowSpeedDelay: 150,
+      lowSpeedDelay: 200,
     },
     compatible: {
       // **** 自定义兼容配置 **** //
@@ -140,11 +148,6 @@ module.exports = {
           desc: '仓库内脚本，重定向改为代理，并设置响应头Content-Type。作用：方便script拦截器直接使用，避免引起跨域问题和脚本内容限制问题。',
         },
       },
-      'github-releases.githubusercontent.com': {
-        '.*': {
-          sni: 'baidu.com',
-        },
-      },
       'github.githubassets.com': {
         '.*': {
           sni: 'baidu.com',
@@ -155,9 +158,6 @@ module.exports = {
           cacheDays: 365,
           desc: '图片，缓存1年',
         },
-        '.*': {
-          sni: 'baidu.com',
-        },
       },
       'collector.github.com': {
         '.*': {
@@ -167,33 +167,20 @@ module.exports = {
       'customer-stories-feed.github.com': {
         '.*': { proxy: 'customer-stories-feed.fastgit.org' },
       },
-      'raw.githubusercontent.com': {
-        '.*': {
-          sni: 'baidu.com',
-        },
-      },
       'user-images.githubusercontent.com': {
-        '.*': {
-          sni: 'baidu.com',
-        },
         '^/.*\\.png(\\?.*)?$': {
           cacheDays: 365,
           desc: '用户在PR或issue等内容中上传的图片，缓存1年。注：每张图片都有唯一的ID，不会重复，可以安心缓存',
         },
       },
       'private-user-images.githubusercontent.com': {
-        '.*': {
-          sni: 'baidu.com',
-        },
         '^/.*\\.png(\\?.*)?$': {
-          cacheHours: 1,
-          desc: '用户在PR或issue等内容中上传的图片，缓存1小时就够了，因为每次刷新页面都是不一样的链接。',
+          cacheDays: 30,
+          cacheHours: null,
+          desc: '用户在PR或issue等内容中上传的图片，缓存30天',
         },
       },
       'avatars.githubusercontent.com': {
-        '.*': {
-          sni: 'baidu.com',
-        },
         '^/u/\\d+(\\?.*)?$': {
           cacheDays: 365,
           desc: '用户头像，缓存1年',
@@ -240,8 +227,7 @@ module.exports = {
       },
       'fonts.googleapis.com': {
         '.*': {
-          proxy: 'fonts.geekzu.org',
-          backup: ['fonts.loli.net'],
+          proxy: 'fonts.loli.net',
           test: 'https://fonts.googleapis.com/css?family=Oswald',
         },
       },
@@ -290,65 +276,94 @@ module.exports = {
     },
     // 预设置IP列表
     preSetIpList: {
-      'github.com': [
-        '4.237.22.38',
-        '20.26.156.215',
-        '20.27.177.113',
-        '20.87.245.0',
-        '20.200.245.247',
-        '20.201.28.151',
-        '20.205.243.166',
-        '140.82.113.3',
-        '140.82.114.4',
-        '140.82.116.3',
-        '140.82.116.4',
-        '140.82.121.3',
-        '140.82.121.4',
-      ],
-      'api.github.com': [
-        '20.26.156.210',
-        '20.27.177.116',
-        '20.87.245.6',
-        '20.200.245.245',
-        '20.201.28.148',
-        '20.205.243.168',
-        '20.248.137.49',
-        '140.82.112.5',
-        '140.82.113.6',
-        '140.82.116.6',
-        '140.82.121.6',
-      ],
-      'codeload.github.com': [
-        '20.26.156.216',
-        '20.27.177.114',
-        '20.87.245.7',
-        '20.200.245.246',
-        '20.201.28.149',
-        '20.205.243.165',
-        '20.248.137.55',
-        '140.82.113.9',
-        '140.82.114.10',
-        '140.82.116.10',
-        '140.82.121.9',
-      ],
-      '*.githubusercontent.com': [
-        '185.199.108.133',
-        '185.199.109.133',
-        '185.199.110.133',
-        '185.199.111.133',
-      ],
-      'github.githubassets.com': [
-        '185.199.108.154',
-        '185.199.109.154',
-        '185.199.110.154',
-        '185.199.111.154',
-      ],
-      'github.io': [
-        '185.199.108.153',
-        '185.199.109.153',
-        '185.199.110.153',
-        '185.199.111.153',
-      ],
+      'github.com': {
+        '4.237.22.38': true,
+        '20.26.156.215': true,
+        '20.27.177.113': true,
+        '20.87.245.0': true,
+        '20.200.245.247': true,
+        '20.201.28.151': true,
+        '20.205.243.166': true,
+        '140.82.113.3': true,
+        '140.82.114.4': true,
+        '140.82.116.3': true,
+        '140.82.116.4': true,
+        '140.82.121.3': true,
+        '140.82.121.4': true,
+      },
+      'api.github.com': {
+        '20.26.156.210': true,
+        '20.27.177.116': true,
+        '20.87.245.6': true,
+        '20.200.245.245': true,
+        '20.201.28.148': true,
+        '20.205.243.168': true,
+        '20.248.137.49': true,
+        '140.82.112.5': true,
+        '140.82.113.6': true,
+        '140.82.116.6': true,
+        '140.82.121.6': true,
+      },
+      'codeload.github.com': {
+        '20.26.156.216': true,
+        '20.27.177.114': true,
+        '20.87.245.7': true,
+        '20.200.245.246': true,
+        '20.201.28.149': true,
+        '20.205.243.165': true,
+        '20.248.137.55': true,
+        '140.82.113.9': true,
+        '140.82.114.10': true,
+        '140.82.116.10': true,
+        '140.82.121.9': true,
+      },
+      '*.githubusercontent.com': {
+        '146.75.92.133': true,
+        '199.232.88.133': true,
+        '199.232.144.133': true,
+      },
+      'viewscreen.githubusercontent.com': {
+        '140.82.112.21': true,
+        '140.82.112.22': true,
+        '140.82.113.21': true,
+        '140.82.113.22': true,
+        '140.82.114.21': true,
+        '140.82.114.22': true,
+      },
+      'github.io': {
+        '185.199.108.153': true,
+        '185.199.109.153': true,
+        '185.199.110.153': true,
+        '185.199.111.153': true,
+      },
+      '*.githubassets.com': {
+        '185.199.108.154': true,
+        '185.199.109.154': true,
+        '185.199.110.154': true,
+        '185.199.111.154': true,
+      },
+      '^(analytics|ghcc)\\.githubassets\\.com$': {
+        '185.199.108.153': true,
+        '185.199.110.153': true,
+        '185.199.109.153': true,
+        '185.199.111.153': true,
+      },
+      '*.pixiv.net': {
+        // 以下为 `cdn-origin.pixiv.net` 域名的IP
+        '210.140.139.154': true,
+        '210.140.139.157': true,
+        '210.140.139.160': true,
+      },
+      'hub.docker.com': {
+        '44.221.37.199': true,
+        '52.44.227.212': true,
+        '54.156.140.159': true,
+      },
+      'sessions-bugsnag.docker.com': {
+        '44.221.37.199': true,
+        '52.44.227.212': true,
+        '54.156.140.159': true,
+      },
     },
     whiteList: {
       '*.cn': true,
@@ -419,4 +434,129 @@ module.exports = {
   },
   proxy: {},
   plugin: {},
+  help: {
+    dataList: [
+      {
+        title: '查看DevSidecar的说明文档（Wiki）',
+        url: 'https://github.com/docmirror/dev-sidecar/wiki',
+      },
+      {
+        title: '为了展示更多帮助信息，请启用 “远程配置” 功能！！！',
+      },
+    ],
+  },
 }
+
+// region 加载本地配置文件所需的方法
+
+function _getConfigPath () {
+  const dir = defaultConfig.server.setting.userBasePath
+  if (!fs.existsSync(dir)) {
+    return null
+  }
+
+  // 兼容1.7.3及以下版本的配置文件处理逻辑
+  const newFilePath = path.join(dir, '/config.json')
+  const oldFilePath = path.join(dir, '/config.json5')
+  if (!fs.existsSync(newFilePath)) {
+    if (fs.existsSync(oldFilePath)) {
+      return oldFilePath // 如果新文件不存在，且旧文件存在，则返回旧文件路径
+    } else {
+      return null // 两个文件都不存在
+    }
+  }
+
+  return newFilePath
+}
+
+function _getConfig () {
+  const configFilePath = _getConfigPath()
+  if (configFilePath == null) {
+    return {}
+  }
+
+  if (!fs.existsSync(configFilePath)) {
+    return {}
+  }
+
+  return jsonApi.parse(fs.readFileSync(configFilePath))
+}
+
+function _getRemoteSavePath (suffix = '') {
+  const dir = defaultConfig.server.setting.userBasePath
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir)
+  }
+  return path.join(dir, `/remote_config${suffix}.json5`)
+}
+
+function _readRemoteConfigStr (suffix = '') {
+  if (defaultConfig.app.remoteConfig.enabled !== true) {
+    if (suffix === '_personal') {
+      if (!defaultConfig.app.remoteConfig.personalUrl) {
+        return '{}'
+      }
+    } else if (suffix === '') {
+      if (!defaultConfig.app.remoteConfig.url) {
+        return '{}'
+      }
+    }
+    return '{}'
+  }
+  try {
+    const path = _getRemoteSavePath(suffix)
+    if (fs.existsSync(path)) {
+      const file = fs.readFileSync(path)
+      return file.toString()
+    }
+  } catch {
+  }
+
+  return '{}'
+}
+
+function _readRemoteConfig (suffix = '') {
+  return jsonApi.parse(_readRemoteConfigStr(suffix))
+}
+
+function _getConfigFromFiles () {
+  const newConfig = _getConfig()
+
+  const merged = newConfig != null ? lodash.cloneDeep(newConfig) : {}
+
+  if (defaultConfig.app.remoteConfig.enabled === true) {
+    let personalRemoteConfig = null
+    let shareRemoteConfig = null
+
+    if (defaultConfig.app.remoteConfig.personalUrl) {
+      personalRemoteConfig = _readRemoteConfig('_personal')
+      mergeApi.doMerge(merged, personalRemoteConfig) // 先合并一次个人远程配置，使配置顺序在前
+    }
+    if (defaultConfig.app.remoteConfig.url) {
+      shareRemoteConfig = _readRemoteConfig()
+      mergeApi.doMerge(merged, shareRemoteConfig) // 先合并一次共享远程配置，使配置顺序在前
+    }
+    mergeApi.doMerge(merged, defaultConfig) // 合并默认配置，顺序排在最后
+    if (defaultConfig.app.remoteConfig.url) {
+      mergeApi.doMerge(merged, shareRemoteConfig) // 再合并一次共享远程配置，使配置生效
+    }
+    if (defaultConfig.app.remoteConfig.personalUrl) {
+      mergeApi.doMerge(merged, personalRemoteConfig) // 再合并一次个人远程配置，使配置生效
+    }
+  } else {
+    mergeApi.doMerge(merged, defaultConfig) // 合并默认配置
+  }
+  if (newConfig != null) {
+    mergeApi.doMerge(merged, newConfig) // 再合并一次用户配置，使用户配置重新生效
+  }
+  mergeApi.deleteNullItems(merged) // 删除为null及[delete]的项
+
+  return merged
+}
+
+// endregion
+
+// 从本地文件中加载配置
+defaultConfig.configFromFiles = _getConfigFromFiles()
+
+module.exports = defaultConfig

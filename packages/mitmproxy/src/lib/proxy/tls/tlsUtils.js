@@ -1,7 +1,6 @@
-const fs = require('fs')
-const path = require('path')
+const fs = require('node:fs')
+const path = require('node:path')
 const _ = require('lodash')
-const mkdirp = require('mkdirp')
 const forge = require('node-forge')
 const log = require('../../../utils/util.log')
 const config = require('../common/config')
@@ -74,7 +73,16 @@ utils.covertNodeCertToForgeCert = function (originCertificate) {
   return forge.pki.certificateFromAsn1(obj)
 }
 
-utils.createFakeCertificateByDomain = function (caKey, caCert, domain) {
+utils.createFakeCertificateByDomain = function (caKey, caCert, domain, mappingHostNames) {
+  // 作用域名
+  const altNames = []
+  mappingHostNames.forEach((mappingHostName) => {
+    altNames.push({
+      type: 2, // 1=电子邮箱、2=DNS名称
+      value: mappingHostName,
+    })
+  })
+
   const keys = pki.rsa.generateKeyPair(2048)
   const cert = pki.createCertificate()
   cert.publicKey = keys.publicKey
@@ -127,10 +135,7 @@ utils.createFakeCertificateByDomain = function (caKey, caCert, domain) {
   // },
   {
     name: 'subjectAltName',
-    altNames: [{
-      type: 2,
-      value: domain,
-    }],
+    altNames,
   }, {
     name: 'subjectKeyIdentifier',
   }, {
@@ -245,7 +250,7 @@ utils.initCA = function ({ caCertPath, caKeyPath }) {
       caKeyPath,
       create: false,
     }
-  } catch (e) {
+  } catch {
     const caObj = utils.createCA(config.caName)
 
     const caCert = caObj.cert
@@ -253,8 +258,7 @@ utils.initCA = function ({ caCertPath, caKeyPath }) {
 
     const certPem = pki.certificateToPem(caCert)
     const keyPem = pki.privateKeyToPem(cakey)
-
-    mkdirp.sync(path.dirname(caCertPath))
+    fs.mkdirSync(path.dirname(caCertPath), { recursive: true })
     fs.writeFileSync(caCertPath, certPem)
     fs.writeFileSync(caKeyPath, keyPem)
     log.info('生成证书文件成功，共2个文件:', caCertPath, caKeyPath)

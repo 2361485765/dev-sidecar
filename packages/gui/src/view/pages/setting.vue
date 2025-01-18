@@ -1,6 +1,7 @@
 <script>
 import { ipcRenderer } from 'electron'
 import Plugin from '../mixins/plugin'
+import { colorTheme } from '../composables/theme'
 
 export default {
   name: 'Setting',
@@ -10,25 +11,14 @@ export default {
       key: 'app',
       removeUserConfigLoading: false,
       reloadLoading: false,
-      themeBackup: null,
       urlBackup: null,
       personalUrlBackup: null,
     }
   },
-  created () {
-
-  },
-  mounted () {
-  },
   methods: {
     ready (config) {
-      this.themeBackup = config.app.theme
       this.urlBackup = config.app.remoteConfig.url
       this.personalUrlBackup = config.app.remoteConfig.personalUrl
-    },
-    async openLog () {
-      const dir = await this.$api.info.getConfigDir()
-      this.$api.ipc.openPath(`${dir}/logs/`)
     },
     getEventKey (event) {
       // 忽略以下键
@@ -187,15 +177,17 @@ export default {
     async applyAfter () {
       let reloadLazy = 10
 
+      let theme = this.config.app.theme
+      if (theme === 'system') {
+        theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+      }
+      colorTheme.value = theme
+
       // 判断远程配置地址是否变更过，如果是则重载远程配置并重启服务
       if (this.config.app.remoteConfig.url !== this.urlBackup || this.config.app.remoteConfig.personalUrl !== this.personalUrlBackup) {
         await this.$api.config.downloadRemoteConfig()
         await this.reloadConfigAndRestart()
         reloadLazy = 300
-      }
-
-      // 判断是否切换了主题，如果是，则刷新页面
-      if (this.config.app.theme !== this.themeBackup) {
         setTimeout(() => window.location.reload(), reloadLazy)
       }
 
@@ -235,11 +227,19 @@ export default {
       try {
         const remoteConfig = {}
 
-        await this.$api.config.readRemoteConfigStr().then((ret) => { remoteConfig.old1 = ret })
-        await this.$api.config.readRemoteConfigStr('_personal').then((ret) => { remoteConfig.old2 = ret })
+        await this.$api.config.readRemoteConfigStr().then((ret) => {
+          remoteConfig.old1 = ret
+        })
+        await this.$api.config.readRemoteConfigStr('_personal').then((ret) => {
+          remoteConfig.old2 = ret
+        })
         await this.$api.config.downloadRemoteConfig()
-        await this.$api.config.readRemoteConfigStr().then((ret) => { remoteConfig.new1 = ret })
-        await this.$api.config.readRemoteConfigStr('_personal').then((ret) => { remoteConfig.new2 = ret })
+        await this.$api.config.readRemoteConfigStr().then((ret) => {
+          remoteConfig.new1 = ret
+        })
+        await this.$api.config.readRemoteConfigStr('_personal').then((ret) => {
+          remoteConfig.new2 = ret
+        })
 
         if (remoteConfig.old1 === remoteConfig.new1 && remoteConfig.old2 === remoteConfig.new2) {
           this.$message.info('远程配置没有变化，不做任何处理。')
@@ -256,7 +256,7 @@ export default {
       this.$confirm({
         title: '确定要恢复出厂设置吗？',
         width: 610,
-        content: (h) => (
+        content: h => (
           <div class="restore-factory-settings">
             <hr />
             <p>
@@ -276,7 +276,9 @@ export default {
                 1. 找到备份文件，路径：
                 <span>~/.dev-sidecar/config.json.时间戳.bak.json</span>
                 <br />
-                2. 将该备份文件重命名为<span>config.json</span>，再重启软件即可恢复个性化配置。
+                2. 将该备份文件重命名为
+                <span>config.json</span>
+                ，再重启软件即可恢复个性化配置。
               </div>
             </p>
           </div>
@@ -309,6 +311,9 @@ export default {
   <ds-container>
     <template slot="header">
       设置
+      <span>
+        <a-button class="md-mr-10" icon="profile" @click="openLog()">查看日志</a-button>
+      </span>
     </template>
 
     <div v-if="config">
@@ -316,10 +321,6 @@ export default {
         <a-checkbox v-model="config.app.autoStart.enabled" @change="onAutoStartChange">
           本应用开机自启
         </a-checkbox>
-        <a-button class="md-mr-10" icon="profile" @click="openLog()">日志</a-button>
-        <div class="form-help">
-          windows下建议开启开机自启。<a @click="openExternal('https://github.com/docmirror/dev-sidecar/blob/master/doc/recover.md')">更多说明参考</a>
-        </div>
       </a-form-item>
       <a-form-item v-if="systemPlatform === 'mac'" label="隐藏Dock图标" :label-col="labelCol" :wrapper-col="wrapperCol">
         <a-checkbox v-model="config.app.dock.hideWhenWinClose">
@@ -364,6 +365,9 @@ export default {
           <a-radio-button value="dark" title="dark">
             暗色
           </a-radio-button>
+          <a-radio-button value="system" title="system">
+            跟随系统
+          </a-radio-button>
         </a-radio-group>
       </a-form-item>
       <a-form-item label="首页提示" :label-col="labelCol" :wrapper-col="wrapperCol">
@@ -402,7 +406,7 @@ export default {
           部分快捷键已被占用：F5=刷新页面，F12=开发者工具（DevTools）
         </div>
       </a-form-item>
-      <a-form-item label="启动时打开窗口" :label-col="labelCol" :wrapper-col="wrapperCol">
+      <a-form-item label="启动时窗口状态" :label-col="labelCol" :wrapper-col="wrapperCol">
         <a-radio-group v-model="config.app.startShowWindow" default-value="true" button-style="solid">
           <a-radio-button :value="true">
             打开窗口
@@ -444,6 +448,20 @@ export default {
         </a-radio-group>
         <div class="form-help">
           预发布版本号为带有 “<code>-</code>” 的版本。注：该配置只对当前版本为正式版本时有效。
+        </div>
+      </a-form-item>
+      <hr>
+      <a-form-item label="日志文件保存目录" :label-col="labelCol" :wrapper-col="wrapperCol">
+        <a-input v-model="config.app.logFileSavePath" />
+        <div class="form-help">
+          修改后，重启DS才生效！<br>
+          注意：原目录中的文件不会自动转移到新的目录，请自行转移或删除。
+        </div>
+      </a-form-item>
+      <a-form-item label="保留日志文件数" :label-col="labelCol" :wrapper-col="wrapperCol">
+        <a-input-number v-model="config.app.keepLogFileCount" :step="1" :min="0" />
+        <div class="form-help">
+          修改后，重启DS才生效，隔天才会清理多余的历史日志文件！
         </div>
       </a-form-item>
     </div>

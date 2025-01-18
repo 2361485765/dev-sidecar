@@ -66,7 +66,7 @@ export default {
 <template>
   <ds-container>
     <template slot="header">
-      Git代理设置
+      Git.exe代理设置
       <span style="color:#999;">
         仅针对git命令行的代理设置，github网站的访问无需设置
       </span>
@@ -115,8 +115,12 @@ export default {
     </div>
     <template slot="footer">
       <div class="footer-bar">
-        <a-button :loading="resetDefaultLoading" class="md-mr-10" icon="sync" @click="resetDefault()">恢复默认</a-button>
-        <a-button :loading="applyLoading" icon="check" type="primary" @click="apply()">应用</a-button>
+        <a-button :loading="resetDefaultLoading" class="md-mr-10" icon="sync" @click="resetDefault()">
+          恢复默认
+        </a-button>
+        <a-button :loading="applyLoading" icon="check" type="primary" @click="apply()">
+          应用
+        </a-button>
       </div>
     </template>
   </ds-container>
